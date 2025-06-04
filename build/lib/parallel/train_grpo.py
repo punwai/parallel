@@ -1,6 +1,5 @@
 from datasets import load_dataset
-# from custom_trl_trainer import GRPOTrainer
-from trl.trainer import GRPOTrainer
+from custom_trl_trainer import GRPOTrainer
 from trl.trainer.grpo_config import GRPOConfig
 
 from prompts import SYSTEM_PROMPT, PROMPT_TEMPLATE

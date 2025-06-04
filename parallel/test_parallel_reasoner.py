@@ -1,82 +1,35 @@
+import asyncio
 from datasets import load_dataset
 from parallel.custom_trl_trainer import GRPOTrainer
+from parallel.parallel_utils import build_parallel_passes
+from parallel.train_grpo import load_and_preprocess_data, reward_len
+from parallel.utils.fork_helpers import format_child_answers, try_extract_forks, try_extract_joins
 from trl.trainer.grpo_config import GRPOConfig
 
 from parallel.prompts import SYSTEM_PROMPT, PROMPT_TEMPLATE
 from parallel.utils.countdown_rewards import compute_score
 from trl.data_utils import maybe_apply_chat_template
 
-# Define the reward function, which rewards completions that are close to 20 characters
-def reward_len(completions, **kwargs):
-    nums = kwargs["nums"]
-    target = kwargs["target"]
-    ground_truths = [
-        {
-            "numbers": [int(n) for n in nums],
-            "target": int(target)
-        } for nums, target in zip(nums, target)
-    ]
-    rewards = [
-        compute_score(completion, ground_truth)
-        for completion, ground_truth in zip(completions, ground_truths)
-    ]
-    return rewards
 
-# Load the Jiayi-Pan/Countdown-Tasks-3to4 dataset
-def load_and_preprocess_data():
-    countdown_dataset = load_dataset("Jiayi-Pan/Countdown-Tasks-3to4", split="train")
-
-    def make_prompt(example):
-        target = example.get("target", "")
-        numbers = example.get("nums", "")
-        # Format numbers list into string
-        if isinstance(numbers, list):
-            numbers_str = ", ".join(str(n) for n in numbers)
-        else:
-            numbers_str = str(numbers)
-        # Use the PROMPT_TEMPLATE defined above
-        prompt = PROMPT_TEMPLATE.format(
-            numbers=numbers_str,
-            target=target
-        )
-        return {"prompt": prompt}
-
-    countdown_dataset = countdown_dataset.map(make_prompt)
-    return countdown_dataset
+from dataclasses import dataclass
+from typing import List, Union
+import asyncio
 
 if __name__ == "__main__":
     countdown_dataset = load_and_preprocess_data()
-    training_args = GRPOConfig(output_dir="Qwen3-4B", logging_steps=10, use_vllm=True)
+    training_args = GRPOConfig(
+        output_dir="Qwen3-4B", 
+        logging_steps=10, 
+        use_vllm=True)
     trainer = GRPOTrainer(
         model="Qwen/Qwen3-4B-Base",
         reward_funcs=reward_len,
         args=training_args,
         train_dataset=countdown_dataset
     )
-
-    prompt = next(iter(countdown_dataset))
-    prompts_text = maybe_apply_chat_template({
-        "messages": [
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT
-            },
-            {
-                "role": "user",
-                "content": prompt["prompt"]
-            }
-        ]
-    }, trainer.processing_class)
-
-    print(prompts_text)
-
-    completion_ids = trainer.vllm_client.generate(
-        prompts=[prompts_text],
-        n=1,
-        repetition_penalty=1.0,
-        temperature=1.0,
-        top_p=1.0,
-        top_k=-1,
-        min_p=0.0,
-        max_tokens=16,
-    )
+    prompts = [next(iter(countdown_dataset))]
+    formatted_prompts = [{"prompt": prompt["prompt"]} for prompt in prompts]
+    # trainer._generate_and_score_completions_2(formatted_prompts)
+    
+    parallel_passes = build_parallel_passes(trainer, prompts * 5)
+    print(parallel_passes)

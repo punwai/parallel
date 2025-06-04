@@ -1,9 +1,15 @@
+README.md
 setup.py
 ./parallel/__init__.py
 ./parallel/custom_trl_trainer.py
 ./parallel/prompts.py
 ./parallel/test_parallel_reasoner.py
 ./parallel/train_grpo.py
+./parallel/tests/__init__.py
+./parallel/tests/test_fork_join_formatter.py
+./parallel/utils/__init__.py
+./parallel/utils/countdown_rewards.py
+./parallel/utils/fork_helpers.py
 parallel/__init__.py
 parallel/custom_trl_trainer.py
 parallel/prompts.py
@@ -13,3 +19,8 @@ parallel.egg-info/PKG-INFO
 parallel.egg-info/SOURCES.txt
 parallel.egg-info/dependency_links.txt
 parallel.egg-info/top_level.txt
+parallel/tests/__init__.py
+parallel/tests/test_fork_join_formatter.py
+parallel/utils/__init__.py
+parallel/utils/countdown_rewards.py
+parallel/utils/fork_helpers.py

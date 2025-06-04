@@ -1,10 +1,10 @@
 from datasets import load_dataset
-# from custom_trl_trainer import GRPOTrainer
-from trl.trainer import GRPOTrainer
+from parallel.custom_trl_trainer import GRPOTrainer
 from trl.trainer.grpo_config import GRPOConfig
 
-from prompts import SYSTEM_PROMPT, PROMPT_TEMPLATE
-from utils.countdown_rewards import compute_score
+from parallel.prompts import SYSTEM_PROMPT, PROMPT_TEMPLATE
+from parallel.utils.countdown_rewards import compute_score
+from trl.data_utils import maybe_apply_chat_template
 
 # Define the reward function, which rewards completions that are close to 20 characters
 def reward_len(completions, **kwargs):
@@ -46,11 +46,37 @@ def load_and_preprocess_data():
 
 if __name__ == "__main__":
     countdown_dataset = load_and_preprocess_data()
-    training_args = GRPOConfig(output_dir="Qwen3-4B", logging_steps=10)
+    training_args = GRPOConfig(output_dir="Qwen3-4B", logging_steps=10, use_vllm=True)
     trainer = GRPOTrainer(
         model="Qwen/Qwen3-4B-Base",
         reward_funcs=reward_len,
         args=training_args,
-        train_dataset=countdown_dataset,
+        train_dataset=countdown_dataset
     )
-    trainer.train()
+
+    prompt = next(iter(countdown_dataset))
+    prompts_text = maybe_apply_chat_template({
+        "messages": [
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT
+            },
+            {
+                "role": "user",
+                "content": prompt["prompt"]
+            }
+        ]
+    }, trainer.processing_class)
+
+    print(prompts_text)
+
+    completion_ids = trainer.vllm_client.generate(
+        prompts=[prompts_text],
+        n=1,
+        repetition_penalty=1.0,
+        temperature=1.0,
+        top_p=1.0,
+        top_k=-1,
+        min_p=0.0,
+        max_tokens=16,
+    )
