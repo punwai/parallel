@@ -30,6 +30,7 @@ if __name__ == "__main__":
     prompts = [next(iter(countdown_dataset))] * 16
     formatted_prompts = [{"prompt": prompt["prompt"]} for prompt in prompts]
 
-    trainer._generate_and_score_completions_2(formatted_prompts)
+    trainer._generate_and_score_completions(formatted_prompts)
+    print("Done")
     
     # parallel_passes = build_parallel_passes(trainer, prompts * 4)

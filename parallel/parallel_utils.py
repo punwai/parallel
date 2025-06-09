@@ -214,7 +214,11 @@ def build_parallel_passes(
         final_parent_ids, skip_special_tokens=True
     )
 
+    print("LEN CHILD IDS", len(child_ids_batch))
+    print("LEN CHILD TEXTS", [len(id) for id in child_ids_batch])
+
     child_ids_batch_flattened = [item for sublist in child_ids_batch for item in sublist]
+    print("LEN CHILD IDS FLATTENED", len(child_ids_batch_flattened))
 
     # can you unflatten the child_reasoning_prompts and child_ids_batch_flattened
     # you can use the child_prompt_indices to do this.
@@ -223,12 +227,14 @@ def build_parallel_passes(
     # child_prompt_indices is a list of lists of indices, one per parent prompt, each containing indices of children
 
     # Unflatten child_reasoning_prompts
-    unflattened_child_reasoning_prompts = [[]] * len(raw_prompts)
-    unflattened_child_ids_batch = [[]] * len(raw_prompts)
+    unflattened_child_reasoning_prompts = [[] for _ in range(len(raw_prompts))]
+    unflattened_child_ids_batch = [[] for _ in range(len(raw_prompts))]
 
     for prompt_idx, ids, prompts in zip(child_prompt_indices, child_ids_batch_flattened, child_batch_prompts):
         unflattened_child_reasoning_prompts[prompt_idx].append(prompts)
         unflattened_child_ids_batch[prompt_idx].append(ids)
+    print("UNFLATTENED CHILD REASONING PROMPTS", len(unflattened_child_reasoning_prompts))
+    print("UNFLATTENED CHILD REASONING PROMPTS", [len(ids) for ids in unflattened_child_reasoning_prompts])
 
     # --- 1E. pack everything -------------------------------------------------------
     return UnprocessedParallelPass(

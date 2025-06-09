@@ -46,7 +46,14 @@ def load_and_preprocess_data():
 
 if __name__ == "__main__":
     countdown_dataset = load_and_preprocess_data()
-    training_args = GRPOConfig(output_dir="Qwen3-4B", logging_steps=10)
+    training_args = GRPOConfig(
+        output_dir="Qwen3-4B", 
+        logging_steps=10, 
+        per_device_train_batch_size=8,
+        max_completion_length=5000,
+        use_vllm=True,
+        vllm_server_port=8005
+    )
     trainer = GRPOTrainer(
         model="Qwen/Qwen3-4B-Base",
         reward_funcs=reward_len,
