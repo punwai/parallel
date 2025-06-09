@@ -2,6 +2,7 @@ README.md
 setup.py
 ./parallel/__init__.py
 ./parallel/custom_trl_trainer.py
+./parallel/parallel_utils.py
 ./parallel/prompts.py
 ./parallel/test_parallel_reasoner.py
 ./parallel/train_grpo.py

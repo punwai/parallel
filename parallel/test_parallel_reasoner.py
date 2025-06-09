@@ -9,8 +9,6 @@ from trl.trainer.grpo_config import GRPOConfig
 from parallel.prompts import SYSTEM_PROMPT, PROMPT_TEMPLATE
 from parallel.utils.countdown_rewards import compute_score
 from trl.data_utils import maybe_apply_chat_template
-
-
 from dataclasses import dataclass
 from typing import List, Union
 import asyncio
@@ -20,16 +18,18 @@ if __name__ == "__main__":
     training_args = GRPOConfig(
         output_dir="Qwen3-4B", 
         logging_steps=10, 
-        use_vllm=True)
+        use_vllm=True,
+        vllm_server_port=8005
+    )
     trainer = GRPOTrainer(
         model="Qwen/Qwen3-4B-Base",
         reward_funcs=reward_len,
         args=training_args,
         train_dataset=countdown_dataset
     )
-    prompts = [next(iter(countdown_dataset))]
+    prompts = [next(iter(countdown_dataset))] * 16
     formatted_prompts = [{"prompt": prompt["prompt"]} for prompt in prompts]
-    # trainer._generate_and_score_completions_2(formatted_prompts)
+
+    trainer._generate_and_score_completions_2(formatted_prompts)
     
-    parallel_passes = build_parallel_passes(trainer, prompts * 5)
-    print(parallel_passes)
+    # parallel_passes = build_parallel_passes(trainer, prompts * 4)

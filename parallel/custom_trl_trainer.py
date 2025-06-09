@@ -1132,12 +1132,11 @@ class GRPOTrainer(Trainer):
         prompts = [x["prompt"] for x in inputs]
         prompts_text = [maybe_apply_chat_template(example, self.processing_class)["prompt"] for example in inputs]
 
-
         if self.use_vllm:
             # First, have main process load weights if needed
             if self.state.global_step != self._last_loaded_step:
                 print("Moving model to VLLM")
-                self._move_model_to_vllm()
+                # self._move_model_to_vllm()
                 self._last_loaded_step = self.state.global_step
                 print("Moved model to VLLM")
 
@@ -1146,36 +1145,44 @@ class GRPOTrainer(Trainer):
             all_prompts_text = gather_object(prompts_text)
             if self.accelerator.is_main_process:
                 with profiling_context(self, "vLLM.generate"):
-                    parallel_passes: List[UnprocessedParallelPass] = build_parallel_passes(self, prompts)
-                completion_ids = [p.initial_reasoning_ids for p in parallel_passes]
-                flattened_child_reasoning_ids = [ids for p in parallel_passes for ids in p.child_reasoning_ids]
-                final_completion_ids = [p.continued_reasoning_ids if p.continued_reasoning_ids else [] for p in parallel_passes]
+                    parallel_passes: UnprocessedParallelPass = build_parallel_passes(self, all_prompts_text)
+                completion_ids = parallel_passes.initial_reasoning_ids
+                child_reasoning_ids = parallel_passes.child_reasoning_ids
+                final_completion_ids = parallel_passes.continued_reasoning_ids
+                child_reasoning_prompts = parallel_passes.child_reasoning_prompts
+                continued_reasoning_prompts = parallel_passes.continued_reasoning_prompts
             else:
                 completion_ids = [None]
-                flattened_child_reasoning_ids = [None]
+                child_reasoning_ids = [None]
                 final_completion_ids = [None]
+                child_reasoning_prompts = [None]
+                continued_reasoning_prompts = [None]
         else:
             raise ValueError("Only vLLM is supported for parallel reasoning")
 
-        # Given a pair:
-        def prepare_prompt_answer_pair(prompts_text, completion_ids_unsliced):
-            completion_ids = broadcast_object_list(completion_ids_unsliced, from_process=0)
+        def distribute_array(inputs, prompts):
+            inputs = broadcast_object_list(inputs, from_process=0)
+            prompts = broadcast_object_list(prompts, from_process=0)
             process_slice = slice(
                 self.accelerator.process_index * len(prompts),
                 (self.accelerator.process_index + 1) * len(prompts),
             )
-            completion_ids = completion_ids[process_slice]
+            inputs = inputs[process_slice]
+            prompts = prompts[process_slice]
+            return inputs, prompts
 
+        # Given a pair:
+        def prepare_prompt_answer_pair(prepare_input, prompts_text, completion_ids):
             prompt_inputs = self.processing_class(
                 text=prompts_text, return_tensors="pt", padding=True, padding_side="left", add_special_tokens=False
             )
-            prompt_inputs = super()._prepare_inputs(prompt_inputs)
+            prompt_inputs = prepare_input(prompt_inputs)
             prompt_ids, prompt_mask = prompt_inputs["input_ids"], prompt_inputs["attention_mask"]
 
             # Pad the completions, and concatenate them with the prompts
             completion_ids = [torch.tensor(ids, device=device) for ids in completion_ids]
             completion_ids = pad(completion_ids, padding_value=self.processing_class.pad_token_id)
-            prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
+            print(completion_ids.shape)
 
             is_eos = completion_ids == self.processing_class.eos_token_id
             eos_idx = torch.full((is_eos.size(0),), is_eos.size(1), dtype=torch.long, device=device)
@@ -1185,12 +1192,11 @@ class GRPOTrainer(Trainer):
 
             return prompt_ids, prompt_mask, completion_ids, completion_mask
 
-        num_total_children = len(flattened_child_reasoning_ids)
-        parent_prompt_ids, parent_prompt_mask, parent_completion_ids, parent_completion_mask = prepare_prompt_answer_pair(prompts_text, completion_ids)
-        child_prompt_ids, child_prompt_mask, child_completion_ids, child_completion_mask = prepare_prompt_answer_pair(prompts_text, flattened_child_reasoning_ids)
-        continued_prompt_ids, continued_prompt_mask, continued_completion_ids, continued_completion_mask = prepare_prompt_answer_pair(prompts_text, final_completion_ids)
 
         def compute_logps(prompt_ids, prompt_mask, completion_ids, completion_mask):
+
+            print(prompt_ids.shape, prompt_mask.shape, completion_ids.shape, completion_mask.shape)
+
             prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
             attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B, P+C)
             logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
@@ -1216,11 +1222,28 @@ class GRPOTrainer(Trainer):
                         ref_per_token_logps = self._get_per_token_logps(
                             self.model, prompt_completion_ids, attention_mask, logits_to_keep, batch_size
                         )
-            return old_per_token_logps, ref_per_token_logps
+            return old_per_token_logps, ref_per_token_logps, attention_mask
 
-        parent_old_per_token_logps, parent_ref_per_token_logps = compute_logps(parent_prompt_ids, parent_prompt_mask, parent_completion_ids, parent_completion_mask)
+        # "prompts_text" = the prompts that we do not want to compute logps for
+        # "completion_ids" = the completions that we want to compute logps for
+
+        # distribute the arrays
+        all_prompts_text, completion_ids = distribute_array(all_prompts_text, completion_ids)
+        child_reasoning_prompts, child_reasoning_ids = distribute_array(child_reasoning_prompts, child_reasoning_ids)
+        continued_reasoning_prompts, final_completion_ids = distribute_array(continued_reasoning_prompts, final_completion_ids)
+
+        parent_prompt_ids, parent_prompt_mask, parent_completion_ids, parent_completion_mask = prepare_prompt_answer_pair(super()._prepare_inputs, all_prompts_text, completion_ids)
+        parent_old_per_token_logps, parent_ref_per_token_logps, _ = compute_logps(parent_prompt_ids, parent_prompt_mask, parent_completion_ids, parent_completion_mask)
+
+        # flatten the childs before we get the logps
+        flattened_child_reasoning_ids = [item for sublist in child_reasoning_ids for item in sublist]
+        flattened_child_reasoning_prompts = [item for sublist in child_reasoning_prompts for item in sublist]
+        child_prompt_ids, child_prompt_mask, child_completion_ids, child_completion_mask = prepare_prompt_answer_pair(super()._prepare_inputs, flattened_child_reasoning_prompts, flattened_child_reasoning_ids)
         child_old_per_token_logps, child_ref_per_token_logps = compute_logps(child_prompt_ids, child_prompt_mask, child_completion_ids, child_completion_mask)
+
+        continued_prompt_ids, continued_prompt_mask, continued_completion_ids, continued_completion_mask = prepare_prompt_answer_pair(super()._prepare_inputs, continued_reasoning_prompts, final_completion_ids)
         continued_old_per_token_logps, continued_ref_per_token_logps = compute_logps(continued_prompt_ids, continued_prompt_mask, continued_completion_ids, continued_completion_mask)
+
 
         # Decode the generated completions
         completions_text = self.processing_class.batch_decode(continued_completion_ids, skip_special_tokens=True)
@@ -1278,9 +1301,9 @@ class GRPOTrainer(Trainer):
         advantages = advantages[process_slice]
 
         # Log the metrics
-        if mode == "train":
-            self.state.num_input_tokens_seen += self.accelerator.gather_for_metrics(attention_mask.sum()).sum().item()
-        self._metrics[mode]["num_tokens"] = [self.state.num_input_tokens_seen]
+        # if mode == "train":
+        #     self.state.num_input_tokens_seen += self.accelerator.gather_for_metrics(attention_mask.sum()).sum().item()
+        # self._metrics[mode]["num_tokens"] = [self.state.num_input_tokens_seen]
 
         # log completion lengths, mean, min, max
         # agg_completion_mask = self.accelerator.gather_for_metrics(completion_mask.sum(1))
@@ -1399,11 +1422,15 @@ class GRPOTrainer(Trainer):
         # Compute the per-token log probabilities for the model
         prompt_ids, prompt_mask = inputs["prompt_ids"], inputs["prompt_mask"]
         completion_ids, completion_mask = inputs["completion_ids"], inputs["completion_mask"]
-        input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
-        attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
-        logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
 
-        per_token_logps = self._get_per_token_logps(model, input_ids, attention_mask, logits_to_keep)
+        def get_per_token_logps(model, prompt_ids, prompt_mask, completion_ids, completion_mask):
+            input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
+            attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
+            logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
+            per_token_logps = self._get_per_token_logps(model, input_ids, attention_mask, logits_to_keep)
+            return per_token_logps
+
+        per_token_logps = get_per_token_logps(model, prompt_ids, prompt_mask, completion_ids, completion_mask)
 
         # Compute the KL divergence between the model and the reference model
         if self.beta != 0.0:

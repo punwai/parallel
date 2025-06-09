@@ -27,7 +27,7 @@ def format_child_answers(
     str
     """
     # 1. collapse into {task: answer} mapping
-    mapping = {item["task"]: item["join"] for item in pairs}
+    mapping = [{"child task": item["task"], "child response": item["join"]} for item in pairs]
 
     # 2. JSON serialise
     json_str = json.dumps(
@@ -72,10 +72,12 @@ def try_extract_forks(text: str) -> Optional[List[Dict[str, object]]]:
         try:
             tasks = json.loads(m.group(2))
             if not isinstance(tasks, list):
-                raise ValueError("Fork payload must be a JSON list.")
-            results.append({"budget": budget, "tasks": list(map(str, tasks))})
+                return None
+            # Only keep the first 4 tasks
+            tasks = list(map(str, tasks))[:4]
+            results.append({"budget": budget, "tasks": tasks})
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Malformed JSON inside <fork>: {exc}") from None
+            return None
         
     return results[0] if results and len(results) else None
 

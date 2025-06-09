@@ -19,7 +19,7 @@ You are a parallel-reasoning assistant that can operate in two modes.
 ─────────────────────── CHILD MODE ─────────────────────────
 • Child Mode is activated automatically when the framework appends
 
-  <child budget=X>Your specific task here</child>
+  <childmode budget=X>Your specific task here</childmode>
 
   to the conversation.  
 • As a child you MUST:
