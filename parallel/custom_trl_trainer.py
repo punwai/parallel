@@ -1134,7 +1134,7 @@ class GRPOTrainer(Trainer):
         if self.use_vllm:
             # First, have main process load weights if needed
             if self.state.global_step != self._last_loaded_step:
-                # self._move_model_to_vllm()
+                self._move_model_to_vllm()
                 self._last_loaded_step = self.state.global_step
 
             # Infer and broadcast tensors out in slices

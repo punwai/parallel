@@ -52,10 +52,10 @@ if __name__ == "__main__":
         per_device_train_batch_size=8,
         max_completion_length=5000,
         use_vllm=True,
-        vllm_server_port=8005
+        vllm_server_port=8000
     )
     trainer = GRPOTrainer(
-        model="Qwen/Qwen3-4B-Base",
+        model="Qwen/Qwen3-4B",
         reward_funcs=reward_len,
         args=training_args,
         train_dataset=countdown_dataset,
