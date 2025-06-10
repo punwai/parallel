@@ -1152,13 +1152,17 @@ class GRPOTrainer(Trainer):
                 # For elements where child_reasoning_ids has length zero, fill continued_reasoning_prompts with an empty array
                 continued_reasoning_prompts = []
                 final_completion_ids = []
-                for ch_ids, cr_prompt, cr_ids in zip(child_reasoning_ids, parallel_passes.continued_reasoning_prompts, parallel_passes.continued_reasoning):
+                idx = 0
+                for ch_ids in child_reasoning_ids:
                     if len(ch_ids) == 0:
                         continued_reasoning_prompts.append("none")
-                        final_completion_ids.append([])
+                        final_completion_ids.append([int(self.processing_class.eos_token_id)])
                     else:
+                        cr_prompt = parallel_passes.continued_reasoning_prompts[idx]
+                        cr_ids = parallel_passes.continued_reasoning_ids[idx]
                         continued_reasoning_prompts.append(cr_prompt)
                         final_completion_ids.append(cr_ids)
+                        idx += 1
             else:
                 completion_ids = [None] * len(all_prompts_text)
                 child_reasoning_ids = [None] * len(all_prompts_text)
@@ -1174,12 +1178,15 @@ class GRPOTrainer(Trainer):
             prompts = broadcast_object_list(prompts, from_process=0)
             process_index = self.accelerator.process_index
             print("Slicing arrays", process_index)
+            print("len prompts", len(prompts))
             process_slice = slice(
                 self.accelerator.process_index * num_prompts,
                 (self.accelerator.process_index + 1) * num_prompts,
             )
+            print("Slicing arrays", process_slice)
             inputs = inputs[process_slice]
             prompts = prompts[process_slice]
+
             return inputs, prompts
 
         # Given a pair:
@@ -1252,12 +1259,12 @@ class GRPOTrainer(Trainer):
         flattened_child_reasoning_ids = [item for sublist in child_reasoning_ids for item in sublist]
         flattened_child_reasoning_prompts = [item for sublist in child_reasoning_prompts for item in sublist]
         child_prompt_ids, child_prompt_mask, child_completion_ids, child_completion_mask = prepare_prompt_answer_pair(super()._prepare_inputs, flattened_child_reasoning_prompts, flattened_child_reasoning_ids)
-        child_old_per_token_logps, child_ref_per_token_logps = compute_logps(child_prompt_ids, child_prompt_mask, child_completion_ids, child_completion_mask)
+        child_old_per_token_logps, child_ref_per_token_logps, _ = compute_logps(child_prompt_ids, child_prompt_mask, child_completion_ids, child_completion_mask)
         # 
 
         print("Computing logps for continued")
         continued_prompt_ids, continued_prompt_mask, continued_completion_ids, continued_completion_mask = prepare_prompt_answer_pair(super()._prepare_inputs, continued_reasoning_prompts, final_completion_ids)
-        continued_old_per_token_logps, continued_ref_per_token_logps = compute_logps(continued_prompt_ids, continued_prompt_mask, continued_completion_ids, continued_completion_mask)
+        continued_old_per_token_logps, continued_ref_per_token_logps, _ = compute_logps(continued_prompt_ids, continued_prompt_mask, continued_completion_ids, continued_completion_mask)
 
 
         # Decode the generated completions
@@ -1293,7 +1300,9 @@ class GRPOTrainer(Trainer):
 
         # Gather the reward per function: this part is crucial, because the rewards are normalized per group and the
         # completions may be distributed across processes
+        print("Gathering rewards")
         rewards_per_func = gather(rewards_per_func)
+        print("Rewards gathered")
 
         # Apply weights to each reward function's output and sum
         rewards = (rewards_per_func * self.reward_weights.to(device).unsqueeze(0)).nansum(dim=1)
@@ -1310,11 +1319,13 @@ class GRPOTrainer(Trainer):
             advantages = advantages / (std_grouped_rewards + 1e-4)
 
         # Slice to keep only the local part of the data
+        print("Slicing advantages")
         process_slice = slice(
             self.accelerator.process_index * len(prompts),
             (self.accelerator.process_index + 1) * len(prompts),
         )
         advantages = advantages[process_slice]
+        print("Slicing advantages")
 
         # Log the metrics
         # if mode == "train":
@@ -1510,7 +1521,7 @@ class GRPOTrainer(Trainer):
             inputs["child_old_per_token_logps"],
         )
 
-        loss = loss_1 + loss_2 + loss_3 / 3
+        loss = (loss_1 + loss_2 + loss_3) / 3
 
         # Log the metrics
         mode = "eval" if self.control.should_evaluate else "train"

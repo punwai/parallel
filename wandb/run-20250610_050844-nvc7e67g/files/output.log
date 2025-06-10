@@ -1,0 +1,47 @@
+  0%|                                                                                 | 0/245184 [00:00<?, ?it/s]Traceback (most recent call last):
+num_prompts: 8
+Distributing arrays
+Broadcasting arrays 0
+Slicing arrays 0
+len prompts 48
+Slicing arrays slice(0, 8, None)
+Distributing child arrays
+Broadcasting arrays 0
+Slicing arrays 0
+len prompts 48
+Slicing arrays slice(0, 8, None)
+Distributing continued arrays
+Broadcasting arrays 0
+Slicing arrays 0
+len prompts 48
+Slicing arrays slice(0, 8, None)
+Preparing parent arrays
+Computing logps for parent
+Computing logps for child
+Computing logps for continued
+  File "/home/ubuntu/parallel/parallel/train_grpo.py", line 68, in <module>
+    trainer.train()
+  File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/transformers/trainer.py", line 2240, in train
+    return inner_training_loop(
+  File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/transformers/trainer.py", line 2555, in _inner_training_loop
+    tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
+  File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/transformers/trainer.py", line 3739, in training_step
+    inputs = self._prepare_inputs(inputs)
+  File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/trl/extras/profiling.py", line 87, in wrapper
+    return func(self, *args, **kwargs)
+  File "/home/ubuntu/parallel/parallel/custom_trl_trainer.py", line 900, in _prepare_inputs
+    accumulated_local_batch = self._generate_and_score_completions(accumulated_local_batch)
+  File "/home/ubuntu/parallel/parallel/custom_trl_trainer.py", line 1267, in _generate_and_score_completions
+    continued_old_per_token_logps, continued_ref_per_token_logps, _ = compute_logps(continued_prompt_ids, continued_prompt_mask, continued_completion_ids, continued_completion_mask)
+  File "/home/ubuntu/parallel/parallel/custom_trl_trainer.py", line 1231, in compute_logps
+    ref_per_token_logps = self._get_per_token_logps(
+  File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/trl/extras/profiling.py", line 87, in wrapper
+    return func(self, *args, **kwargs)
+  File "/home/ubuntu/parallel/parallel/custom_trl_trainer.py", line 823, in _get_per_token_logps
+    logits = model(
+  File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/deepspeed/utils/nvtx.py", line 20, in wrapped_fn
+    ret_val = func(*args, **kwargs)

@@ -1,0 +1,19 @@
+  0%|                                                                                 | 0/245184 [00:00<?, ?it/s]
+num_prompts: 8
+Distributing arrays
+Broadcasting arrays 0
+Slicing arrays 0
+len prompts 48
+Slicing arrays slice(0, 8, None)
+Distributing child arrays
+Broadcasting arrays 0
+Slicing arrays 0
+len prompts 48
+Slicing arrays slice(0, 8, None)
+Distributing continued arrays
+Broadcasting arrays 0
+Slicing arrays 0
+len prompts 46
+Slicing arrays slice(0, 8, None)
+Preparing parent arrays
+Computing logps for parent
