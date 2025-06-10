@@ -1129,6 +1129,8 @@ class GRPOTrainer(Trainer):
         mode = "eval" if self.control.should_evaluate else "train"
 
         prompts = [x["prompt"] for x in inputs]
+        num_prompts = len(prompts)
+        print(f"num_prompts: {num_prompts}")
         prompts_text = [maybe_apply_chat_template(example, self.processing_class)["prompt"] for example in inputs]
 
         if self.use_vllm:
@@ -1145,24 +1147,36 @@ class GRPOTrainer(Trainer):
                     parallel_passes: UnprocessedParallelPass = build_parallel_passes(self, all_prompts_text)
                 completion_ids = parallel_passes.initial_reasoning_ids
                 child_reasoning_ids = parallel_passes.child_reasoning_ids
-                final_completion_ids = parallel_passes.continued_reasoning_ids
                 child_reasoning_prompts = parallel_passes.child_reasoning_prompts
-                continued_reasoning_prompts = parallel_passes.continued_reasoning_prompts
+
+                # For elements where child_reasoning_ids has length zero, fill continued_reasoning_prompts with an empty array
+                continued_reasoning_prompts = []
+                final_completion_ids = []
+                for ch_ids, cr_prompt, cr_ids in zip(child_reasoning_ids, parallel_passes.continued_reasoning_prompts, parallel_passes.continued_reasoning):
+                    if len(ch_ids) == 0:
+                        continued_reasoning_prompts.append("none")
+                        final_completion_ids.append([])
+                    else:
+                        continued_reasoning_prompts.append(cr_prompt)
+                        final_completion_ids.append(cr_ids)
             else:
-                completion_ids = [None]
-                child_reasoning_ids = [None]
-                final_completion_ids = [None]
-                child_reasoning_prompts = [None]
-                continued_reasoning_prompts = [None]
+                completion_ids = [None] * len(all_prompts_text)
+                child_reasoning_ids = [None] * len(all_prompts_text)
+                final_completion_ids = [None] * len(all_prompts_text)
+                child_reasoning_prompts = [None] * len(all_prompts_text)
+                continued_reasoning_prompts = [None] * len(all_prompts_text)
         else:
             raise ValueError("Only vLLM is supported for parallel reasoning")
 
-        def distribute_array(inputs, prompts):
+        def distribute_array(inputs, prompts, num_prompts):
+            print("Broadcasting arrays", self.accelerator.process_index)
             inputs = broadcast_object_list(inputs, from_process=0)
             prompts = broadcast_object_list(prompts, from_process=0)
+            process_index = self.accelerator.process_index
+            print("Slicing arrays", process_index)
             process_slice = slice(
-                self.accelerator.process_index * len(prompts),
-                (self.accelerator.process_index + 1) * len(prompts),
+                self.accelerator.process_index * num_prompts,
+                (self.accelerator.process_index + 1) * num_prompts,
             )
             inputs = inputs[process_slice]
             prompts = prompts[process_slice]
@@ -1221,26 +1235,33 @@ class GRPOTrainer(Trainer):
         # "completion_ids" = the completions that we want to compute logps for
 
         # distribute the arrays
-        all_prompts_text, completion_ids = distribute_array(all_prompts_text, completion_ids)
-        child_reasoning_prompts, child_reasoning_ids = distribute_array(child_reasoning_prompts, child_reasoning_ids)
-        continued_reasoning_prompts, final_completion_ids = distribute_array(continued_reasoning_prompts, final_completion_ids)
+        print("Distributing arrays")
+        all_prompts_text, completion_ids = distribute_array(all_prompts_text, completion_ids, num_prompts)
+        print("Distributing child arrays")
+        child_reasoning_prompts, child_reasoning_ids = distribute_array(child_reasoning_prompts, child_reasoning_ids, num_prompts)
+        print("Distributing continued arrays")
+        continued_reasoning_prompts, final_completion_ids = distribute_array(continued_reasoning_prompts, final_completion_ids, num_prompts)
 
+        print("Preparing parent arrays")
         parent_prompt_ids, parent_prompt_mask, parent_completion_ids, parent_completion_mask = prepare_prompt_answer_pair(super()._prepare_inputs, all_prompts_text, completion_ids)
+        print("Computing logps for parent")
         parent_old_per_token_logps, parent_ref_per_token_logps, _ = compute_logps(parent_prompt_ids, parent_prompt_mask, parent_completion_ids, parent_completion_mask)
 
         # flatten the childs before we get the logps
+        print("Computing logps for child")
         flattened_child_reasoning_ids = [item for sublist in child_reasoning_ids for item in sublist]
         flattened_child_reasoning_prompts = [item for sublist in child_reasoning_prompts for item in sublist]
-
         child_prompt_ids, child_prompt_mask, child_completion_ids, child_completion_mask = prepare_prompt_answer_pair(super()._prepare_inputs, flattened_child_reasoning_prompts, flattened_child_reasoning_ids)
         child_old_per_token_logps, child_ref_per_token_logps = compute_logps(child_prompt_ids, child_prompt_mask, child_completion_ids, child_completion_mask)
         # 
 
+        print("Computing logps for continued")
         continued_prompt_ids, continued_prompt_mask, continued_completion_ids, continued_completion_mask = prepare_prompt_answer_pair(super()._prepare_inputs, continued_reasoning_prompts, final_completion_ids)
         continued_old_per_token_logps, continued_ref_per_token_logps = compute_logps(continued_prompt_ids, continued_prompt_mask, continued_completion_ids, continued_completion_mask)
 
 
         # Decode the generated completions
+        print("Decoding continued completions and computing advantages")
         completions_text = self.processing_class.batch_decode(continued_completion_ids, skip_special_tokens=True)
         completions = completions_text
 

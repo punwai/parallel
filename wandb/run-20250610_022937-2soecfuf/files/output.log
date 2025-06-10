@@ -1,0 +1,40 @@
+  0%|                                                                                   | 0/245184 [00:00<?, ?it/s]Traceback (most recent call last):
+  File "/home/ubuntu/parallel/parallel/train_grpo.py", line 68, in <module>
+    trainer.train()
+  File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/transformers/trainer.py", line 2240, in train
+    return inner_training_loop(
+  File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/transformers/trainer.py", line 2555, in _inner_training_loop
+    tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
+  File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/transformers/trainer.py", line 3739, in training_step
+    inputs = self._prepare_inputs(inputs)
+  File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/trl/extras/profiling.py", line 87, in wrapper
+    return func(self, *args, **kwargs)
+  File "/home/ubuntu/parallel/parallel/custom_trl_trainer.py", line 900, in _prepare_inputs
+    accumulated_local_batch = self._generate_and_score_completions(accumulated_local_batch)
+  File "/home/ubuntu/parallel/parallel/custom_trl_trainer.py", line 1145, in _generate_and_score_completions
+    parallel_passes: UnprocessedParallelPass = build_parallel_passes(self, all_prompts_text)
+  File "/home/ubuntu/parallel/parallel/parallel_utils.py", line 144, in build_parallel_passes
+    child_futures = [
+  File "/home/ubuntu/parallel/parallel/parallel_utils.py", line 145, in <listcomp>
+    trainer.vllm_client.agenerate(
+AttributeError: 'VLLMClient' object has no attribute 'agenerate'. Did you mean: 'generate'?
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/home/ubuntu/parallel/parallel/train_grpo.py", line 68, in <module>
+[rank0]:     trainer.train()
+[rank0]:   File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/transformers/trainer.py", line 2240, in train
+[rank0]:     return inner_training_loop(
+[rank0]:   File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/transformers/trainer.py", line 2555, in _inner_training_loop
+[rank0]:     tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
+[rank0]:   File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/transformers/trainer.py", line 3739, in training_step
+[rank0]:     inputs = self._prepare_inputs(inputs)
+[rank0]:   File "/home/ubuntu/miniconda3/envs/cs224r/lib/python3.10/site-packages/trl/extras/profiling.py", line 87, in wrapper
+[rank0]:     return func(self, *args, **kwargs)
+[rank0]:   File "/home/ubuntu/parallel/parallel/custom_trl_trainer.py", line 900, in _prepare_inputs
+[rank0]:     accumulated_local_batch = self._generate_and_score_completions(accumulated_local_batch)
+[rank0]:   File "/home/ubuntu/parallel/parallel/custom_trl_trainer.py", line 1145, in _generate_and_score_completions
+[rank0]:     parallel_passes: UnprocessedParallelPass = build_parallel_passes(self, all_prompts_text)
+[rank0]:   File "/home/ubuntu/parallel/parallel/parallel_utils.py", line 144, in build_parallel_passes
+[rank0]:     child_futures = [
+[rank0]:   File "/home/ubuntu/parallel/parallel/parallel_utils.py", line 145, in <listcomp>
+[rank0]:     trainer.vllm_client.agenerate(
+[rank0]: AttributeError: 'VLLMClient' object has no attribute 'agenerate'. Did you mean: 'generate'?

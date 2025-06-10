@@ -5,6 +5,7 @@ setup.py
 ./parallel/parallel_utils.py
 ./parallel/prompts.py
 ./parallel/test_parallel_reasoner.py
+./parallel/test_tokenizer.py
 ./parallel/train_grpo.py
 ./parallel/tests/__init__.py
 ./parallel/tests/test_fork_join_formatter.py
@@ -13,6 +14,7 @@ setup.py
 ./parallel/utils/fork_helpers.py
 parallel/__init__.py
 parallel/custom_trl_trainer.py
+parallel/parallel_utils.py
 parallel/prompts.py
 parallel/test_parallel_reasoner.py
 parallel/train_grpo.py

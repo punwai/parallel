@@ -1,0 +1,7 @@
+{"time":"2025-06-10T03:01:12.27538321Z","level":"INFO","msg":"stream: starting","core version":"0.20.1","symlink path":"/home/ubuntu/parallel/wandb/run-20250610_030112-o1mxj3rh/logs/debug-core.log"}
+{"time":"2025-06-10T03:01:12.645169571Z","level":"INFO","msg":"stream: created new stream","id":"o1mxj3rh"}
+{"time":"2025-06-10T03:01:12.645245834Z","level":"INFO","msg":"stream: started","id":"o1mxj3rh"}
+{"time":"2025-06-10T03:01:12.645278474Z","level":"INFO","msg":"sender: started","stream_id":"o1mxj3rh"}
+{"time":"2025-06-10T03:01:12.645296863Z","level":"INFO","msg":"handler: started","stream_id":"o1mxj3rh"}
+{"time":"2025-06-10T03:01:12.645283483Z","level":"INFO","msg":"writer: Do: started","stream_id":"o1mxj3rh"}
+{"time":"2025-06-10T03:01:12.862961222Z","level":"INFO","msg":"Starting system monitor"}

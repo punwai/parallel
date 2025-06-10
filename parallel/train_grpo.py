@@ -1,8 +1,8 @@
 from datasets import load_dataset
 # from custom_trl_trainer import GRPOTrainer
-from trl.trainer import GRPOTrainer
 from trl.trainer.grpo_config import GRPOConfig
 
+from parallel.custom_trl_trainer import GRPOTrainer
 from prompts import SYSTEM_PROMPT, PROMPT_TEMPLATE
 from utils.countdown_rewards import compute_score
 
@@ -47,15 +47,20 @@ def load_and_preprocess_data():
 if __name__ == "__main__":
     countdown_dataset = load_and_preprocess_data()
     training_args = GRPOConfig(
-        output_dir="Qwen3-4B", 
+        output_dir="Qwen3-1.7B", 
         logging_steps=10, 
-        per_device_train_batch_size=8,
-        max_completion_length=5000,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=8,
+        gradient_accumulation_steps=2,
+        gradient_checkpointing=True,
+        max_completion_length=2048,
         use_vllm=True,
-        vllm_server_port=8000
+        vllm_server_port=8000,
+        bf16=True,
+        report_to="wandb",
     )
     trainer = GRPOTrainer(
-        model="Qwen/Qwen3-4B",
+        model="Qwen/Qwen3-1.7B",
         reward_funcs=reward_len,
         args=training_args,
         train_dataset=countdown_dataset,

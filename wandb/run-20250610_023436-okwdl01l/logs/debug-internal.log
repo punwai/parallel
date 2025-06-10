@@ -1,0 +1,7 @@
+{"time":"2025-06-10T02:34:36.974557601Z","level":"INFO","msg":"stream: starting","core version":"0.20.1","symlink path":"/home/ubuntu/parallel/wandb/run-20250610_023436-okwdl01l/logs/debug-core.log"}
+{"time":"2025-06-10T02:34:37.447717858Z","level":"INFO","msg":"stream: created new stream","id":"okwdl01l"}
+{"time":"2025-06-10T02:34:37.447780473Z","level":"INFO","msg":"stream: started","id":"okwdl01l"}
+{"time":"2025-06-10T02:34:37.447833402Z","level":"INFO","msg":"writer: Do: started","stream_id":"okwdl01l"}
+{"time":"2025-06-10T02:34:37.448002206Z","level":"INFO","msg":"handler: started","stream_id":"okwdl01l"}
+{"time":"2025-06-10T02:34:37.448077865Z","level":"INFO","msg":"sender: started","stream_id":"okwdl01l"}
+{"time":"2025-06-10T02:34:37.646177894Z","level":"INFO","msg":"Starting system monitor"}
